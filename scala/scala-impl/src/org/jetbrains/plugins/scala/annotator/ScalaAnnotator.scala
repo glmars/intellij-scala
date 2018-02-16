@@ -93,7 +93,7 @@ abstract class ScalaAnnotator extends Annotator
       private def expressionPart(expr: ScExpression) {
         if (!compiled) {
           checkExpressionType(expr, holder, typeAware)
-          checkExpressionImplicitParameters(expr, holder)
+          checkExpressionImplicitParameters(expr, holder, typeAware)
           ByNameParameter.annotate(expr, holder, typeAware)
         }
 
@@ -178,7 +178,7 @@ abstract class ScalaAnnotator extends Annotator
 
       override def visitTypeElement(te: ScTypeElement) {
         checkLiteralTypesAllowed(te, holder)
-        checkTypeElementForm(te, holder)
+        checkTypeElementForm(te, holder, typeAware)
         super.visitTypeElement(te)
       }
 
@@ -1068,13 +1068,15 @@ abstract class ScalaAnnotator extends Annotator
     checkExpressionTypeInner(fromUnderscore = false)
   }
 
-  private def checkExpressionImplicitParameters(expr: ScExpression, holder: AnnotationHolder) {
+  private def checkExpressionImplicitParameters(expr: ScExpression, holder: AnnotationHolder, typeAware: Boolean) {
     expr.findImplicitParameters match {
       case Some(seq) =>
         for (resolveResult <- seq if resolveResult != null) {
           registerUsedImports(expr, resolveResult)
           registerUsedElement(expr, resolveResult, checkWrite = false)
         }
+        if (typeAware)
+          NotFoundImplicitParameters.highlight(expr, seq, holder)
       case _ =>
     }
   }
@@ -1139,7 +1141,7 @@ abstract class ScalaAnnotator extends Annotator
     }
   }
 
-  private def checkTypeElementForm(typeElement: ScTypeElement, holder: AnnotationHolder) {
+  private def checkTypeElementForm(typeElement: ScTypeElement, holder: AnnotationHolder, typeAware: Boolean) {
     //todo: check bounds conformance for parameterized type
     typeElement match {
       case simpleTypeElement: ScSimpleTypeElement =>
@@ -1150,6 +1152,8 @@ abstract class ScalaAnnotator extends Annotator
             for (r <- parameters if r != null) {
               registerUsedImports(typeElement, r)
             }
+            if (typeAware)
+              NotFoundImplicitParameters.highlight(simpleTypeElement, parameters, holder)
           case _ =>
         }
       case _ =>
