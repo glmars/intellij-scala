@@ -1486,7 +1486,7 @@
             </implementation-class>
         </component>
       <component>
-        <implementation-class>org.jetbrains.plugins.scala.annotator.importsTracker.ScalaRefCountHolderComponent</implementation-class>
+        <implementation-class>org.jetbrains.plugins.scala.annotator.usageTracker.ScalaRefCountHolderComponent</implementation-class>
       </component>
     </project-components>
 
