@@ -995,6 +995,7 @@
                         displayName="Annotator Based Error Inspection" groupPath="Scala" groupName="Internal" isInternal="true"
                         shortName="AnnotatorBasedErrorInspection" level="ERROR"
                         enabledByDefault="false" language="Scala"/>
+
         <localInspection implementationClass="org.jetbrains.plugins.scala.codeInspection.bundled.BundledCompoundInspection"
                          displayName="Scala bundled inspections runner" groupPath="Scala" groupName="General"
                          shortName="ScalaBundledInsRunner" enabledByDefault="false" language="Scala"/>
@@ -1488,7 +1489,7 @@
         <implementation-class>org.jetbrains.plugins.scala.codeInsight.implicits.ImplicitHintsPassFactory</implementation-class>
       </component>
       <component>
-        <implementation-class>org.jetbrains.plugins.scala.annotator.importsTracker.ScalaRefCountHolderComponent</implementation-class>
+        <implementation-class>org.jetbrains.plugins.scala.annotator.usageTracker.ScalaRefCountHolderComponent</implementation-class>
       </component>
     </project-components>
 

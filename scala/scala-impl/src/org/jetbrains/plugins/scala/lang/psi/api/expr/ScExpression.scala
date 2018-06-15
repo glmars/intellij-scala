@@ -6,10 +6,11 @@ package expr
 
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi._
+import org.jetbrains.plugins.scala.extensions.{ChildOf, PsiNamedElementExt, StringExt, childOf}
 import org.jetbrains.plugins.scala.extensions.{PsiNamedElementExt, StringExt}
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil.{MethodValue, isAnonymousExpression}
 import org.jetbrains.plugins.scala.lang.psi.api.InferUtil.{SafeCheckException, extractImplicitParameterType}
-import org.jetbrains.plugins.scala.lang.psi.api.base.{ScIntLiteral, ScLiteral}
+import org.jetbrains.plugins.scala.lang.psi.api.base.{ScIntLiteral, ScLiteral, ScParenthesizedElement}
 import org.jetbrains.plugins.scala.lang.psi.api.expr.ExpectedTypes.ParameterType
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.imports.usages.ImportUsed
 import org.jetbrains.plugins.scala.lang.psi.impl.ScalaPsiElementFactory.createExpressionFromText
@@ -372,22 +373,17 @@ object ScExpression {
             def updateExpected(oldRes: ScType): ScType = {
               try {
                 val updatedWithExpected =
-                  InferUtil.updateAccordingToExpectedType(rtp, fromImplicitParameters = true,
+                  InferUtil.updateAccordingToExpectedType(rtp, fromImplicitSearch = false,
                     filterTypeParams = false, expectedType = expType, expr = expr, canThrowSCE = true)
-                updatedWithExpected match {
-                  case newRes =>
-                    updateWithImplicitParameters(newRes, checkExpectedType = true, fromUnderscore)
-                  case _ =>
-                    updateWithImplicitParameters(oldRes, checkExpectedType = true, fromUnderscore)
-                }
+
+                updateWithImplicitParameters(updatedWithExpected, checkExpectedType = true, fromUnderscore)
               } catch {
                 case _: SafeCheckException =>
                   updateWithImplicitParameters(oldRes, checkExpectedType = false, fromUnderscore)
               }
             }
 
-            if (!isMethodInvocation(expr)) {
-              //it is not updated according to expected type, let's do it
+            if (shouldUpdateImplicitParams(expr)) {
               res = updateExpected(rtp)
             }
 
@@ -401,7 +397,7 @@ object ScExpression {
                       if (languageLevel != Scala_2_11 || ScalaPsiUtil.toSAMType(expect, expr).isEmpty) {
                         res = updateType(retType)
                       }
-                    case _                  => res = updateType(retType)
+                    case _ => res = updateType(retType)
                   }
                 case _ => res = updateType(retType)
               }
@@ -522,17 +518,17 @@ object ScExpression {
     }
 
     @tailrec
-    private def isMethodInvocation(expr: ScExpression): Boolean = {
+    private def shouldUpdateImplicitParams(expr: ScExpression): Boolean = {
+      //true if it wasn't updated in MethodInvocation method
       expr match {
-        case _: ScPrefixExpr => false
-        case _: ScPostfixExpr => false
-        case _: MethodInvocation => true
-        case p: ScParenthesisedExpr =>
-          p.innerElement match {
-            case Some(exp) => isMethodInvocation(exp)
-            case _ => false
-          }
-        case _ => false
+        case _: ScPrefixExpr                    => true
+        case _: ScPostfixExpr                   => true
+        case ChildOf(ScInfixExpr(_, `expr`, _)) => false //implicit parameters are in infix expression
+        case ChildOf(_: ScGenericCall)          => false //implicit parameters are in generic call
+        case ChildOf(_: ScAssignStmt)           => false //simple var cannot have implicit parameters, otherwise it's for assignment
+        case _: MethodInvocation                => false
+        case ScParenthesisedExpr(inner)         => shouldUpdateImplicitParams(inner)
+        case _                                  => true
       }
     }
 
@@ -550,7 +546,7 @@ object ScExpression {
                 else None
               case _ => None
             }
-          case _                               => None
+          case _ => None
         }
       }
 
@@ -560,31 +556,6 @@ object ScExpression {
         case MethodValue(method) if expr.scalaLanguageLevelOrDefault == Scala_2_11 || method.getParameterList.getParametersCount > 0 =>
           checkForSAM(etaExpansionHappened = true)
         case _ => None
-      }
-    }
-
-    private def removeMethodType(tp: ScType, expected: ScType): ScType = {
-      def inner(retType: ScType, updateType: ScType => ScType): ScType = {
-        expected.removeAbstracts match {
-          case FunctionType(_, _) => tp
-          case expect if expr.isSAMEnabled =>
-            val languageLevel = expr.scalaLanguageLevelOrDefault
-            if (languageLevel != Scala_2_11 || ScalaPsiUtil.toSAMType(expect, expr).isEmpty) {
-              updateType(retType)
-            }
-            else tp
-          case _                  => updateType(retType)
-        }
-      }
-
-      tp match {
-        case ScTypePolymorphicType(ScMethodType(retType, params, _), typeParams) if params.isEmpty &&
-          !ScUnderScoreSectionUtil.isUnderscore(expr) =>
-          inner(retType, t => ScTypePolymorphicType(t, typeParams))
-        case ScMethodType(retType, params, _) if params.isEmpty &&
-          !ScUnderScoreSectionUtil.isUnderscore(expr) =>
-          inner(retType, t => t)
-        case _ => tp
       }
     }
   }

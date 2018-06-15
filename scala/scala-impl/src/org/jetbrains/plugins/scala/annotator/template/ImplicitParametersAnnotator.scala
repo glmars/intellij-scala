@@ -2,9 +2,8 @@ package org.jetbrains.plugins.scala.annotator.template
 
 import com.intellij.lang.annotation.{Annotation, AnnotationHolder}
 import com.intellij.openapi.editor.markup.TextAttributes
-import com.intellij.openapi.util.TextRange
-import com.intellij.ui.JBColor
 import org.jetbrains.plugins.scala.annotator.AnnotatorPart
+import org.jetbrains.plugins.scala.annotator.usageTracker.UsageTracker
 import org.jetbrains.plugins.scala.lang.psi.api.{ImplicitParametersOwner, InferUtil}
 import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 
@@ -16,10 +15,9 @@ import scala.collection.Seq
   */
 object ImplicitParametersAnnotator extends AnnotatorPart[ImplicitParametersOwner] {
 
-  override def kind: Class[ImplicitParametersOwner] = classOf[ImplicitParametersOwner]
-
   override def annotate(element: ImplicitParametersOwner, holder: AnnotationHolder, typeAware: Boolean): Unit = {
     element.findImplicitParameters.foreach { params =>
+      UsageTracker.registerUsedElementsAndImports(element, params, checkWrite = false)
       if (typeAware) highlightNotFound(element, params, holder)
     }
   }
